@@ -1,0 +1,66 @@
+# OpenPI Code Organization: Essential vs. Skip
+
+This guide outlines the codebase priorities for **$\pi_{0.5}$ fine-tuning** and **Rby1 deployment**.
+
+---
+
+## 🔴 ESSENTIAL: Core Model & Training (Must Review)
+
+### 1. Core Model Architecture
+The backbone of the OpenPI system, focusing on the flow-based model and vision integration.
+
+| File | Why Essential | What to Know |
+| :--- | :--- | :--- |
+| **`pi0.py`** | The $\pi_{0.5}$ model implementation | • Flow-based action generation<br>• Dual Gemma expert setup<br>• Attention masking logic<br>• Beta sampling for flow matching |
+| **`pi0_config.py`** | Model architecture definition | • Available layers/configs<br>• LoRA settings for fine-tuning<br>• State vs. discrete token inputs |
+| **`gemma.py`** | LLM backbone used in $\pi_{0.5}$ | • Vision+language fusion mechanism<br>• Attention head structure<br>• Feed-forward dims |
+| **`siglip.py`** | Vision encoder | • Converts images $\rightarrow$ embeddings<br>• Handles image normalization |
+| **`tokenizer.py`** | Token encoding | • PaligemmaTokenizer (for state + prompts)<br>• Vocabulary size & mapping |
+| **`lora.py`** | Fine-tuning efficiency | • How LoRA works in this codebase<br>• Parameter updates during training |
+
+### 2. Training Infrastructure
+Tools required to adapt the model to new datasets or robot configurations.
+
+* **`training/config.py`**: Training config factory. Predefined configs (e.g., `pi05_base`), custom configs for Rby1, and Model/Data/Optimizer setup.
+* **`training/data_loader.py`**: Data pipeline. Handles batch construction from LeRobot format and observation/action pairing.
+* **`training/checkpoints.py`**: Model persistence. Save/load formats and optimizer state storage.
+* **`training/weight_loaders.py`**: Transfer learning. Logic for loading `pi0_base` into a fine-tuning session.
+* **`training/optimizer.py`**: Optimization setup. Learning rate schedules (warmup, cosine decay) and AdamW selection.
+
+### 3. Transforms & Normalization
+Crucial for ensuring data consistency between training and real-world deployment.
+
+| File | Why Essential | What to Know |
+| :--- | :--- | :--- |
+| **`transforms.py`** | Transformation pipeline | • Repack (dataset $\rightarrow$ canonical)<br>• Normalize (z-score)<br>• Tokenization & Denormalization |
+| **`shared/normalize.py`** | Normalization stats | • RunningStats for mean/std<br>• Critical for model input/output consistency |
+| **`shared/image_tools.py`** | Image preprocessing | • Resizing to $224 \times 224$<br>• RGB normalization to $[-1, 1]$<br>• Tensor format handling |
+
+### 4. Base Policy & Inference
+How the model interacts with the robot controller.
+
+* **`policies/policy.py`**: Core policy abstraction. Contains the `.infer()` method for inference and `.compute_loss()` for training. Bridges JAX and PyTorch.
+* **`policies/policy_config.py`**: Policy factory. System for registering configs and loading normalizers/transforms from checkpoints.
+
+### 5. Entry Points
+* **`scripts/train.py`**: Main training loop, checkpoint management, and metric logging.
+* **`examples/inference.ipynb`**: Quick reference for loading policies and testing action formats.
+
+---
+
+## 🟡 SECONDARY: Good to Have (Review if Time)
+
+### Model Variants & Optimization
+| File | Purpose | When to Review |
+| :--- | :--- | :--- |
+| **`pi0_fast.py`** | Autoregressive model | Only if you need higher inference speeds. |
+| **`models_pytorch/`** | PyTorch port | Only if your team uses PyTorch instead of JAX. |
+| **`training/sharding.py`** | Multi-GPU training | Only if scaling fine-tuning across multiple GPUs. |
+
+### Utilities
+* **`shared/download.py`**: For downloading pre-trained models from Google Cloud Storage (GCS).
+* **`shared/nnx_utils.py`**: Utility functions if you plan on modifying the JAX NNX architecture.
+* **`shared/array_typing.py`**: Reference for internal code style and type annotations.
+
+### Server/Deployment
+* **`serving/websocket_policy_server.py`**: Remote inference server. Review this only if your Rby1 deployment requires distributed inference over a network.
